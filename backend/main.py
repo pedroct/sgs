@@ -1,23 +1,27 @@
+# main.py — versão enxuta e correta p/ seu Nginx atual
 import json
 from typing import List
-
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="API de Gestão de Seguidores do Instagram", version="1.1", docs_url="/api/docs", redoc_url="/api/redoc",openapi_url="/api/openapi.json")
+app = FastAPI(
+    title="API de Gestão de Seguidores do Instagram",
+    version="1.1",
+    # use os PADRÕES dos docs:
+    # docs:        /docs
+    # redoc:       /redoc
+    # openapi:     /openapi.json
+)
 
-# CORS (ajuste allow_origins em produção)
+# (opcional) Em produção, como front e back estão na MESMA origem, CORS não é necessário.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
 )
 
 def _extract_usernames_from_data(data) -> set:
     usernames = set()
-
     def add_from_string_list_data(obj):
         for item in obj.get("string_list_data", []):
             v = item.get("value")
@@ -25,7 +29,6 @@ def _extract_usernames_from_data(data) -> set:
                 v = v.strip().lstrip("@").lower()
                 if v:
                     usernames.add(v)
-
     if isinstance(data, list):
         for entry in data:
             if isinstance(entry, dict):
@@ -48,48 +51,36 @@ def _load_json_bytes(raw_bytes: bytes):
 
 def _classify_file(filename: str, data_obj) -> str:
     name = (filename or "").lower()
-    if "following" in name:
-        return "following"
-    if "followers" in name:
-        return "followers"
+    if "following" in name:  return "following"
+    if "followers" in name:  return "followers"
     if isinstance(data_obj, dict):
         keys = set(data_obj.keys())
-        if "relationships_following" in keys or "following" in keys:
-            return "following"
-        if "relationships_followers" in keys or "followers" in keys:
-            return "followers"
+        if "relationships_following" in keys or "following" in keys: return "following"
+        if "relationships_followers" in keys or "followers" in keys:   return "followers"
     return "unknown"
 
 @app.post("/upload")
 async def upload(files: List[UploadFile] = File(...)):
     if not files:
         raise HTTPException(status_code=400, detail="Envie ao menos um arquivo JSON do Instagram.")
-
-    followers_set = set()
-    following_set = set()
-
+    followers_set, following_set = set(), set()
     for f in files:
         raw = await f.read()
         try:
             data = _load_json_bytes(raw)
         except Exception:
             raise HTTPException(status_code=400, detail=f"Arquivo inválido ou não-JSON: {f.filename}")
-
         klass = _classify_file(f.filename, data)
         usernames = _extract_usernames_from_data(data)
-
         if klass == "following":
             following_set |= usernames
         elif klass == "followers":
             followers_set |= usernames
-
     if not following_set:
         raise HTTPException(status_code=400, detail="Não encontrei dados de 'following'. Inclua o following.json.")
     if not followers_set:
         raise HTTPException(status_code=400, detail="Não encontrei dados de 'followers'. Inclua todos os followers_*.json.")
-
     not_following_back = sorted(following_set - followers_set)
-
     return {
         "summary": {
             "total_following": len(following_set),
