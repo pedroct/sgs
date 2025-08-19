@@ -1,0 +1,26 @@
+@'
+name: Backend CI
+on:
+  push:
+    paths:
+      - "backend/**"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -U pip
+      - run: pip install -r requirements.txt
+      # Adicione testes depois; por ora, só checa import e sintaxe
+      - run: python -m py_compile $(git ls-files "*.py")
+'@ | Out-File -Encoding utf8 .github\workflows\backend.yml
