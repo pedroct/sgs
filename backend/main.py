@@ -4,7 +4,7 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="API de Gestão de Seguidores do Instagram", version="1.1")
+app = FastAPI(title="API de Gestão de Seguidores do Instagram", version="1.1", docs_url="/api/docs", redoc_url="/api/redoc",openapi_url="/api/openapi.json")
 
 # CORS (ajuste allow_origins em produção)
 app.add_middleware(

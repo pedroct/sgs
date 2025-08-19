@@ -1,16 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-// Substitua isto:
-// const apiBase = (typeof window !== 'undefined' && (window as any).API_URL) || 'http://localhost:8000'
-
-// Por isto:
 const apiBase = (() => {
   if (typeof window === 'undefined') return '';
   const w = (window as any).API_URL as string | undefined;
   const ls = ((): string | null => {
     try { return localStorage.getItem('API_URL'); } catch { return null; }
   })();
-  // remove barra final para evitar //api
   return ((w || ls || '') as string).replace(/\/+$/, '');
 })();
 
@@ -108,7 +103,8 @@ useEffect(() => {
       const fd = new FormData()
       for (const f of files) fd.append('files', f)
 
-      const res = await fetch(`${apiBase}/api/upload`, { method: 'POST', body: fd })
+      const endpoint = apiBase ? `${apiBase}/upload` : `/api/upload`;
+      const res = await fetch(endpoint, { method: 'POST', body: fd });
       if (!res.ok) {
         const msg = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(msg.detail || 'Falha no upload/processamento')
