@@ -1,14 +1,37 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-const apiBase = (() => {
-  if (typeof window === 'undefined') return '';
-  const w = (window as any).API_URL as string | undefined;
-  const ls = ((): string | null => {
-    try { return localStorage.getItem('API_URL'); } catch { return null; }
-  })();
-  return ((w || ls || '') as string).replace(/\/+$/, '');
-})();
+/** Resolve a base da API pela ordem:
+ *  1) VITE_API_BASE (env do Vite)
+ *  2) window.API_URL (injeção via script)
+ *  3) localStorage.API_URL (override manual)
+ *  4) ''  -> usa proxy da mesma origem em /api
+ */
+const resolveApiBase = (): string => {
+  let base = ''
+  try {
+    // 1) Vite env
+    const vite = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE) || ''
+    if (vite) base = vite
 
+    // 2) window.API_URL
+    if (!base && typeof window !== 'undefined' && (window as any).API_URL) {
+      base = (window as any).API_URL as string
+    }
+
+    // 3) localStorage.API_URL
+    if (!base && typeof window !== 'undefined') {
+      base = localStorage.getItem('API_URL') || ''
+    }
+  } catch {
+    // ignora erros de acesso ao localStorage em navegação privada, etc.
+  }
+
+  return String(base || '').trim().replace(/\/+$/, '')
+}
+
+const API_BASE = resolveApiBase()
+// se base vier vazia, usa o proxy do Nginx em /api
+const UPLOAD_URL = API_BASE ? `${API_BASE}/upload` : `/api/upload`
 
 type Summary = {
   total_following: number
@@ -38,15 +61,15 @@ export default function App() {
   const [verifiedText, setVerifiedText] = useState('')
   const [showVerifiedCfg, setShowVerifiedCfg] = useState(false)
 
-// carrega lista salva no localStorage
-useEffect(() => {
-  try {
-    const raw = localStorage.getItem('verified_skip_list') || ''
-    const arr = raw.split(/\r?\n/).map(normalize).filter(Boolean)
-    setVerifiedSet(new Set(arr))
-    setVerifiedText(arr.join('\n'))
-  } catch {}
-}, [])
+  // carrega lista salva no localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('verified_skip_list') || ''
+      const arr = raw.split(/\r?\n/).map(normalize).filter(Boolean)
+      setVerifiedSet(new Set(arr))
+      setVerifiedText(arr.join('\n'))
+    } catch {}
+  }, [])
 
   const filteredBase = useMemo(() => {
     if (!q) return list
@@ -103,8 +126,7 @@ useEffect(() => {
       const fd = new FormData()
       for (const f of files) fd.append('files', f)
 
-      const endpoint = apiBase ? `${apiBase}/upload` : `/api/upload`;
-      const res = await fetch(endpoint, { method: 'POST', body: fd });
+      const res = await fetch(UPLOAD_URL, { method: 'POST', body: fd })
       if (!res.ok) {
         const msg = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(msg.detail || 'Falha no upload/processamento')
@@ -124,7 +146,7 @@ useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       const tag = target?.tagName?.toLowerCase()
-      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
+      if (tag === 'input' || tag === 'textarea' || (target as any)?.isContentEditable) return
       if (e.key === 'ArrowLeft') setPage(p => Math.max(1, p - 1))
       if (e.key === 'ArrowRight') setPage(p => Math.min(totalPages, p + 1))
     }
@@ -215,25 +237,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {showVerifiedCfg && (
-            <div className="mb-3 p-3 border rounded-xl bg-gray-50">
-              <p className="text-sm text-gray-700 mb-2">Cole aqui os <strong>usernames verificados/exceções</strong> (um por linha). Eles serão ocultados quando "Pular verificados" estiver marcado.</p>
-              <textarea
-                className="w-full border rounded-xl p-2 font-mono text-sm min-h-[120px]"
-                value={verifiedText}
-                onChange={(e) => setVerifiedText(e.target.value)}
-                placeholder={`exemplo:
-instagram
-cristiano
-nike` }
-              />
-              <div className="mt-2 flex gap-2">
-                <button className="px-3 py-1 rounded-lg border bg-white" onClick={saveVerifiedList}>Salvar lista</button>
-                <button className="px-3 py-1 rounded-lg border" onClick={() => { setVerifiedText(''); setVerifiedSet(new Set()); localStorage.removeItem('verified_skip_list') }}>Limpar</button>
-              </div>
-            </div>
-          )}
-
           {/* Controles de paginação */}
           <div className="flex items-center gap-2 text-sm mb-2 flex-wrap">
             <button
@@ -295,7 +298,9 @@ nike` }
                 {pageItems.map(u => (
                   <tr key={u} className="odd:bg-white even:bg-gray-50">
                     <td className="p-2 font-mono">{u}</td>
-                    <td className="p-2"><a href={`https://www.instagram.com/${u}`} target="_blank" rel="noreferrer" className="text-blue-600">abrir</a></td>
+                    <td className="p-2">
+                      <a href={`https://www.instagram.com/${u}`} target="_blank" rel="noreferrer" className="text-blue-600">abrir</a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -305,7 +310,7 @@ nike` }
       )}
 
       <footer className="text-xs text-gray-500 mt-6">
-        Dica: Use ←/→ para navegar. Altere o endpoint em <code>localStorage.API_URL</code> se o backend não estiver em <code>http://localhost:8000</code>.
+        Dica: Use ←/→ para navegar.
       </footer>
     </div>
   )
