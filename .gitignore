@@ -1,0 +1,28 @@
+@'
+# ---- Node/React ----
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+.vscode/
+
+# ---- Python/FastAPI ----
+venv/
+.env
+*.pyc
+__pycache__/
+.coverage
+htmlcov/
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# ---- OS / tools ----
+.DS_Store
+Thumbs.db
+.idea/
+'@ | Out-File -Encoding utf8 .gitignore
