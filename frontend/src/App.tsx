@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-const apiBase = (typeof window !== 'undefined' && (window as any).API_URL) || 'http://localhost:8000'
+// Substitua isto:
+// const apiBase = (typeof window !== 'undefined' && (window as any).API_URL) || 'http://localhost:8000'
+
+// Por isto:
+const apiBase = (() => {
+  if (typeof window === 'undefined') return '';
+  const w = (window as any).API_URL as string | undefined;
+  const ls = ((): string | null => {
+    try { return localStorage.getItem('API_URL'); } catch { return null; }
+  })();
+  // remove barra final para evitar //api
+  return ((w || ls || '') as string).replace(/\/+$/, '');
+})();
+
 
 type Summary = {
   total_following: number

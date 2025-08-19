@@ -60,7 +60,7 @@ def _classify_file(filename: str, data_obj) -> str:
             return "followers"
     return "unknown"
 
-@app.post("/api/upload")
+@app.post("/upload")
 async def upload(files: List[UploadFile] = File(...)):
     if not files:
         raise HTTPException(status_code=400, detail="Envie ao menos um arquivo JSON do Instagram.")
